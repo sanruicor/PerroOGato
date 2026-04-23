@@ -13,13 +13,18 @@ public class AnimalEntry
 {
     public AnimalType animalType;
     public string imageUrl;
+    public string breedName;    // "Golden Retriever", "Ragdoll", etc.
+    public string origin;       // Solo gatos: país de origen
+    public string temperament;  // Solo gatos: temperamento
  
-    // La respuesta correcta en texto, para comparar con el botón pulsado
     public string CorrectAnswer => animalType == AnimalType.Dog ? "PERRO" : "GATO";
  
-    public AnimalEntry(AnimalType type, string url)
+    public AnimalEntry(AnimalType type, string url, string breed, string origin = "", string temperament = "")
     {
-        animalType = type;
-        imageUrl   = url;
+        animalType       = type;
+        imageUrl         = url;
+        breedName        = breed;
+        this.origin      = origin;
+        this.temperament = temperament;
     }
 }
