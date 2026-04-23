@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -8,10 +7,8 @@ using TMPro;
 public class DogOrCatManager : MonoBehaviour
 {
     // ── URLs de las APIs ─────────────────────────────────────────────────────
-    // has_breeds=1  → incluye info de raza en la respuesta
-    // mime_types=jpg → evita GIFs que no carga UnityWebRequestTexture
-    private const string DOG_URL = "https://dog.ceo/api/breeds/image/random";
-    private const string CAT_URL = "https://api.thecatapi.com/v1/images/search?has_breeds=1&mime_types=jpg";
+    private const string DOG_URL    = "https://dog.ceo/api/breeds/image/random";
+    private const string CAT_URL    = "https://api.thecatapi.com/v1/images/search?has_breeds=1&mime_types=jpg";
     private const string CAT_API_KEY = "DEMO-API-KEY";
  
     // ── Configuración ────────────────────────────────────────────────────────
@@ -19,29 +16,38 @@ public class DogOrCatManager : MonoBehaviour
     public int totalRounds = 10;
  
     // ── Estado del juego ─────────────────────────────────────────────────────
-    private int currentRound = 0;
-    private int score = 0;
+    private int currentRound    = 0;
+    private int score           = 0;
     private AnimalEntry currentEntry;
     private bool waitingForAnswer = false;
  
     // ── Paneles UI ───────────────────────────────────────────────────────────
     [Header("Panels")]
-    public GameObject loadingPanel;
-    public GameObject gamePanel;
-    public GameObject resultPanel;
+    public GameObject startPanel;       // Pantalla de inicio con título y botón Start
+    public GameObject loadingPanel;     // Pantalla de carga (spinner mientras llama a la API)
+    public GameObject gamePanel;        // Pantalla de juego
+    public GameObject resultPanel;      // Pantalla de resultados
+ 
+    // ── Start Panel ──────────────────────────────────────────────────────────
+    [Header("Start Panel")]
+    public TextMeshProUGUI titleText;       // "🐾 ¿Perro o Gato?"
+    public TextMeshProUGUI subtitleText;    // "¿Sabrás distinguir la raza?"
+    public Button startButton;             // "¡Jugar!"
  
     // ── Loading Panel ────────────────────────────────────────────────────────
     [Header("Loading Panel")]
-    public TextMeshProUGUI loadingText;
+    public TextMeshProUGUI loadingText;    // "Cargando..."
  
     // ── Game Panel ───────────────────────────────────────────────────────────
     [Header("Game Panel")]
-    public TextMeshProUGUI roundNumberText;       // "Ronda 3 / 10"
-    public RawImage animalImage;                  // Foto del animal
-    public GameObject imageLoadingIndicator;      // "Cargando imagen..."
-    public TextMeshProUGUI breedNameText;         // "Golden Retriever"
-    public Button dogButton;                      // "🐶 PERRO"
-    public Button catButton;                      // "🐱 GATO"
+    public TextMeshProUGUI roundNumberText;     // "Ronda 3 / 10"
+    public RawImage animalImage;               // Foto del animal
+    public Image blurOverlay;                  // Overlay negro semitransparente sobre la imagen
+    public GameObject imageLoadingIndicator;   // Visible mientras descarga la foto
+    public Button hintButton;                  // "🔍 Ver imagen"
+    public TextMeshProUGUI breedNameText;      // "Golden Retriever"
+    public Button dogButton;                   // "🐶 PERRO"
+    public Button catButton;                   // "🐱 GATO"
     public TextMeshProUGUI feedbackText;
     public Button nextButton;
  
@@ -54,45 +60,49 @@ public class DogOrCatManager : MonoBehaviour
     // ────────────────────────────────────────────────────────────────────────
     void Start()
     {
+        // Textos del StartPanel (puedes editarlos también desde el Inspector)
+        if (titleText    != null) titleText.text    = "🐾 ¿Perro o Gato?";
+        if (subtitleText != null) subtitleText.text = "¿Sabrás distinguir la raza?";
+ 
+        // Conectar botones
+        startButton.onClick.AddListener(OnStartClicked);
+        hintButton.onClick.AddListener(OnHintClicked);
         dogButton.onClick.AddListener(() => OnAnswerSelected("PERRO"));
         catButton.onClick.AddListener(() => OnAnswerSelected("GATO"));
         nextButton.onClick.AddListener(OnNextClicked);
         restartButton.onClick.AddListener(OnRestartClicked);
  
-        StartGame();
+        // Arrancar en el StartPanel
+        ShowPanel(startPanel);
     }
  
-    void StartGame()
+    // ── Botón Start ──────────────────────────────────────────────────────────
+    void OnStartClicked()
     {
         currentRound = 0;
-        score = 0;
-        ShowPanel(gamePanel);
-        LoadRound();
+        score        = 0;
+        ShowPanel(loadingPanel);
+        StartCoroutine(FetchAnimalImage());
     }
  
-    // ── Cargar ronda: una llamada a API por ronda ────────────────────────────
+    // ── Cargar ronda ─────────────────────────────────────────────────────────
+    // Llamado tras cada respuesta para preparar la siguiente ronda.
+    // Muestra el loadingPanel mientras descarga la nueva imagen.
     void LoadRound()
     {
         currentRound++;
         waitingForAnswer = false;
  
-        feedbackText.text    = "";
-        breedNameText.text   = "";
-        nextButton.gameObject.SetActive(false);
-        dogButton.interactable = false;
-        catButton.interactable = false;
- 
-        animalImage.gameObject.SetActive(false);
-        imageLoadingIndicator.SetActive(true);
- 
-        roundNumberText.text = $"Ronda {currentRound} / {totalRounds}";
- 
+        ShowPanel(loadingPanel);
         StartCoroutine(FetchAnimalImage());
     }
  
     // ── CORRUTINA: decide el animal y llama a la API correcta ────────────────
     IEnumerator FetchAnimalImage()
     {
+        if (loadingText != null)
+            loadingText.text = "Cargando ronda...";
+ 
         bool isDog = UnityEngine.Random.value > 0.5f;
  
         if (isDog)
@@ -111,14 +121,14 @@ public class DogOrCatManager : MonoBehaviour
             if (request.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError("Error Dog API: " + request.error);
-                yield return StartCoroutine(FetchCat());
+                yield return StartCoroutine(FetchCat()); // fallback
                 yield break;
             }
  
             DogApiResponse response = JsonUtility.FromJson<DogApiResponse>(request.downloadHandler.text);
             string breedName = ExtractBreedFromDogUrl(response.message);
  
-            Debug.Log($"[DogAPI] Ronda {currentRound} | Raza: {breedName} | URL: {response.message}");
+            Debug.Log($"[DogAPI] Ronda {currentRound + 1} | Raza: {breedName} | URL: {response.message}");
  
             currentEntry = new AnimalEntry(AnimalType.Dog, response.message, breedName);
             yield return StartCoroutine(DownloadAndShowTexture(response.message));
@@ -149,12 +159,11 @@ public class DogOrCatManager : MonoBehaviour
                 yield break;
             }
  
-            CatApiEntry cat     = response.items[0];
-            string breedName    = "";
-            string origin       = "";
-            string temperament  = "";
+            CatApiEntry cat    = response.items[0];
+            string breedName   = "";
+            string origin      = "";
+            string temperament = "";
  
-            // has_breeds=1 garantiza que casi siempre habrá info de raza
             if (cat.breeds != null && cat.breeds.Count > 0)
             {
                 CatBreedInfo breed = cat.breeds[0];
@@ -163,50 +172,75 @@ public class DogOrCatManager : MonoBehaviour
                 temperament = breed.temperament;
             }
  
-            Debug.Log($"[CatAPI] Ronda {currentRound} | Raza: {breedName} | Origen: {origin}");
+            Debug.Log($"[CatAPI] Ronda {currentRound + 1} | Raza: {breedName} | Origen: {origin}");
  
             currentEntry = new AnimalEntry(AnimalType.Cat, cat.url, breedName, origin, temperament);
             yield return StartCoroutine(DownloadAndShowTexture(cat.url));
         }
     }
  
-    // ── CORRUTINA: descarga la imagen y la muestra ───────────────────────────
+    // ── CORRUTINA: descarga la imagen ────────────────────────────────────────
     IEnumerator DownloadAndShowTexture(string url)
     {
         using (UnityWebRequest request = UnityWebRequestTexture.GetTexture(url))
         {
             yield return request.SendWebRequest();
  
-            imageLoadingIndicator.SetActive(false);
- 
             if (request.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError("Error descargando imagen: " + request.error);
-                EnableAnswerButtons();
+                ShowGamePanel();
                 yield break;
             }
  
             Texture2D texture = DownloadHandlerTexture.GetContent(request);
             animalImage.texture = texture;
-            animalImage.gameObject.SetActive(true);
- 
             AdjustImageAspect(texture);
-            ShowBreedInfo();
-            EnableAnswerButtons();
+ 
+            ShowGamePanel();
         }
     }
  
-    // ── Muestra la info de raza bajo la imagen ───────────────────────────────
+    // ── Mostrar el GamePanel con el estado inicial de la ronda ───────────────
+    // La imagen está lista pero cubierta por el overlay; se muestra solo la raza.
+    void ShowGamePanel()
+    {
+        ShowPanel(gamePanel);
+ 
+        roundNumberText.text = $"Ronda {currentRound} / {totalRounds}";
+ 
+        // Imagen visible pero tapada por el overlay
+        animalImage.gameObject.SetActive(true);
+        imageLoadingIndicator.SetActive(false);
+        blurOverlay.gameObject.SetActive(true);  // ← imagen oculta hasta pulsar Pista
+ 
+        // Botón Pista activo
+        hintButton.gameObject.SetActive(true);
+        hintButton.interactable = true;
+ 
+        // Botones de respuesta deshabilitados hasta que el jugador decida
+        dogButton.interactable = true;
+        catButton.interactable = true;
+ 
+        feedbackText.text = "";
+        nextButton.gameObject.SetActive(false);
+ 
+        ShowBreedInfo();
+ 
+        waitingForAnswer = true;
+    }
+ 
+    // ── Botón Pista: quita el overlay y revela la imagen ─────────────────────
+    void OnHintClicked()
+    {
+        blurOverlay.gameObject.SetActive(false);
+        hintButton.gameObject.SetActive(false);
+    }
+ 
+    // ── Muestra el nombre y detalles de raza ─────────────────────────────────
     void ShowBreedInfo()
     {
-        if (!string.IsNullOrEmpty(currentEntry.breedName))
-        {
-            breedNameText.text = currentEntry.breedName;
-        }
-        else
-        {
-            breedNameText.text    = "Raza desconocida";
-        }
+        breedNameText.text = !string.IsNullOrEmpty(currentEntry.breedName) ? currentEntry.breedName : "Raza desconocida";
     }
  
     void AdjustImageAspect(Texture2D texture)
@@ -217,18 +251,15 @@ public class DogOrCatManager : MonoBehaviour
             fitter.aspectRatio = (float)texture.width / texture.height;
     }
  
-    void EnableAnswerButtons()
-    {
-        dogButton.interactable = true;
-        catButton.interactable = true;
-        waitingForAnswer = true;
-    }
- 
     // ── Respuesta seleccionada ───────────────────────────────────────────────
     void OnAnswerSelected(string choice)
     {
         if (!waitingForAnswer) return;
         waitingForAnswer = false;
+ 
+        // Revelar la imagen si el jugador respondió sin usarla
+        blurOverlay.gameObject.SetActive(false);
+        hintButton.gameObject.SetActive(false);
  
         dogButton.interactable = false;
         catButton.interactable = false;
@@ -252,6 +283,7 @@ public class DogOrCatManager : MonoBehaviour
             currentRound < totalRounds ? "Siguiente →" : "Ver resultado";
     }
  
+    // ── Botón Siguiente ──────────────────────────────────────────────────────
     void OnNextClicked()
     {
         if (currentRound < totalRounds)
@@ -260,6 +292,7 @@ public class DogOrCatManager : MonoBehaviour
             ShowResults();
     }
  
+    // ── Mostrar resultados ───────────────────────────────────────────────────
     void ShowResults()
     {
         scoreText.text = $"Puntuación final\n{score} / {totalRounds}";
@@ -267,56 +300,47 @@ public class DogOrCatManager : MonoBehaviour
         ShowPanel(resultPanel);
     }
  
-    void OnRestartClicked() => StartGame();
+    // ── Reiniciar → volver al StartPanel ────────────────────────────────────
+    void OnRestartClicked() => ShowPanel(startPanel);
  
-    // ── Extrae la raza del path de la URL de Dog CEO ─────────────────────────
-    // Ejemplos:
-    //   https://images.dog.ceo/breeds/golden-retriever/foto.jpg  → "Golden Retriever"
-    //   https://images.dog.ceo/breeds/hound-afghan/foto.jpg      → "Afghan Hound"
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    void ShowPanel(GameObject panel)
+    {
+        startPanel.SetActive(panel   == startPanel);
+        loadingPanel.SetActive(panel == loadingPanel);
+        gamePanel.SetActive(panel    == gamePanel);
+        resultPanel.SetActive(panel  == resultPanel);
+    }
+ 
+    // Extrae la raza del path de la URL de Dog CEO
+    // https://images.dog.ceo/breeds/golden-retriever/foto.jpg → "Golden Retriever"
+    // https://images.dog.ceo/breeds/hound-afghan/foto.jpg     → "Afghan Hound"
     string ExtractBreedFromDogUrl(string url)
     {
         try
         {
-            // El segmento de raza es el penúltimo: breeds/{raza}/archivo.jpg
-            string[] parts = url.Split('/');
-            string breedSegment = parts[parts.Length - 2]; // e.g. "golden-retriever"
+            string[] parts        = url.Split('/');
+            string breedSegment   = parts[parts.Length - 2];
+            string[] words        = breedSegment.Split('-');
  
-            // Separar por guión: "golden-retriever" → ["golden", "retriever"]
-            string[] words = breedSegment.Split('-');
- 
-            // Dog CEO usa "tipo-subtipo" (hound-afghan) pero la raza real es "Afghan Hound"
-            // → invertir el orden si hay dos palabras para que suene natural
             if (words.Length == 2)
             {
-                string main = Capitalize(words[0]);
-                string sub  = Capitalize(words[1]);
-                return $"{sub} {main}";   // "Afghan Hound" en vez de "Hound Afghan"
+                // Dog CEO usa "tipo-subtipo" → invertir para nombre natural
+                return $"{Capitalize(words[1])} {Capitalize(words[0])}";
             }
  
-            // Un solo término: simplemente capitalizar
             string result = "";
             foreach (string w in words)
                 result += Capitalize(w) + " ";
             return result.Trim();
         }
-        catch
-        {
-            return "Raza desconocida";
-        }
+        catch { return "Raza desconocida"; }
     }
  
     string Capitalize(string s)
     {
         if (string.IsNullOrEmpty(s)) return s;
         return char.ToUpper(s[0]) + s.Substring(1);
-    }
- 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-    void ShowPanel(GameObject panel)
-    {
-        loadingPanel.SetActive(panel == loadingPanel);
-        gamePanel.SetActive(panel == gamePanel);
-        resultPanel.SetActive(panel == resultPanel);
     }
  
     string GetRank(int s, int total)
