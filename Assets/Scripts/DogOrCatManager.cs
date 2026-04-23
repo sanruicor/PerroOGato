@@ -275,12 +275,12 @@ public class DogOrCatManager : MonoBehaviour
         if (correct)
         {
             score++;
-            feedbackText.text  = $"✔ ¡Correcto! {currentEntry.breedName} es un {currentEntry.CorrectAnswer.ToLower()}.";
+            feedbackText.text  = $"¡Correcto! {currentEntry.breedName} es un {currentEntry.CorrectAnswer.ToLower()}.";
             feedbackText.color = Color.green;
         }
         else
         {
-            feedbackText.text  = $"✘ ¡Incorrecto! {currentEntry.breedName} es un {currentEntry.CorrectAnswer.ToLower()}.";
+            feedbackText.text  = $"¡Incorrecto! {currentEntry.breedName} es un {currentEntry.CorrectAnswer.ToLower()}.";
             feedbackText.color = Color.red;
         }
  
@@ -334,9 +334,9 @@ public class DogOrCatManager : MonoBehaviour
     string GetRank(int s, int total)
     {
         float p = (float)s / total;
-        if (p == 1f)   return "🏆 ¡Experto en razas! Ojo de lince.";
-        if (p >= 0.8f) return "😎 ¡Casi perfecto! Muy buen olfato.";
-        if (p >= 0.5f) return "🤔 No está mal... pero alguna raza te engañó.";
-        return "🐾 ¡Las razas te tienen confundido!";
+        if (p == 1f)   return "¡Experto en razas! Ojo de lince.";
+        if (p >= 0.8f) return "¡Casi perfecto! Muy buen olfato.";
+        if (p >= 0.5f) return "No está mal... pero alguna raza te engañó.";
+        return "¡Las razas te tienen confundido!";
     }
 }
